@@ -108,24 +108,24 @@ console.log(uuid)
   }
 };
 
-async function getUserData(req,res) {
-  try {
-    const token = req.headers.authorization;
-    if (!token) {
-      return res.status(401).json({msg:"Unauthorized"});
-    }
-    const _tokenData = token.split(" ")[1];
+// async function getUserData(req,res) {
+//   try {
+//     const token = req.headers.authorization;
+//     if (!token) {
+//       return res.status(401).json({msg:"Unauthorized"});
+//     }
+//     const _tokenData = token.split(" ")[1];
 
-    const _decoded = jwt.verify(_tokenData,JWT_TOKEN);
-    const id = _decoded._id;
-    const user = await usermodel.
+//     const _decoded = jwt.verify(_tokenData,JWT_TOKEN);
+//     const id = _decoded._id;
+//     const user = await usermodel.
 
-    33
-  } catch (error) {
-    console.log(error)
-    res.status(500).json({msg: "Server Side Error"});
-  }
+//     // 33
+//   } catch (error) {
+//     console.log(error)
+//     res.status(500).json({msg: "Server Side Error"});
+//   }
   
-}
+// }
 
 module.exports = { signup,login,getUserData };
