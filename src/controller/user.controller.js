@@ -2,8 +2,11 @@ const mysql = require("mysql");
 const bcrypt = require("bcrypt");
 const { validationResult } = require("express-validator");
 const jwt = require("jsonwebtoken");
+const nodemailer = require("nodemailer");
+const { text } = require("express");
+require("dotenv").config();
 
-const JWT_TOKEN = process.env.JWT_TOKEN
+const JWT_TOKEN = process.env.JWT_TOKEN;
 
 // Create a MySQL connection pool
 const pool = mysql.createPool({
@@ -14,10 +17,71 @@ const pool = mysql.createPool({
   database: "esoft",
 });
 
+const transporter = nodemailer.createTransport({
+  host: "smtp-mail.outlook.com", // Outlook SMTP server
+  port: 587, // Port for TLS
+  secure: false, // Use TLS
+  auth: {
+    user: process.env.EMAIL_USER, // Your Outlook email address
+    pass: process.env.EMAIL_PASS, // Your Outlook email password
+  },
+  tls: {
+    ciphers: 'SSLv3',
+  },
+});
+
+const sendWelcomeEmail = (email, firstName) => {
+  const mailOption = {
+    from: process.env.EMAIL_USER,
+    to: email,
+    subject: "Welcome to Our Service!",
+    text: `Hello ${firstName},\n\nThank you for signing up! We are excited to have you onboard.\n\nBest regards,\nYour Team`,
+  };
+
+  transporter.sendMail(mailOption, (error, info) => {
+    if (error) {
+      console.error("Error sending email:", error);
+    } else {
+      console.log("Email sent: " + info.response);
+    }
+  });
+};
+
+//otpSend
+
+const sendOtp = async(req,res)=>{
+const {email} = req.body;
+if(!email){
+return res.status(400).json({success:false,message:"Email is Required"});
+}
+
+//Genarate 6 Digit Code
+
+const otp = Math.floor(100000+Math.random()*900000);
+
+try {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+  await transporter.sendMail({
+    from:process.env.EMAIL_USER,
+    to:email,
+    subject:"Your OTP CODE",
+    text : `Your OTP code is ${otp}`,
+
+  });
+  return res.status(200).json({success:true,message:"OTP Send Successfully",otp});
+} catch (error) {
+  console.error("Error Sending OTP :",error);
+  return res.status(500).json({success:false,message:"Failed to Send OTP"})
+}
+};
 
 
 const login = async (req, res) => {
   const { email, password } = req.body;
+  console.log(email)
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -46,12 +110,26 @@ const login = async (req, res) => {
         const user = results[0];
         const isMatch = await bcrypt.compare(password, user.password);
         const userType = user.userType;
-        console.log(userType)
+        console.log(userType);
         if (!isMatch) {
           return res.status(401).json({ error: "Invalid email or password." });
         }
-        const token = jwt.sign({firstName:user.firstName,email:user.email,lastName:user.lastName,userTypes:user.userType,uuid:user.uuid},JWT_TOKEN,{expiresIn:"1h"})
-        return res.status(200).json({ message: "Login successful.",token,userType: user.userType});
+        const token = jwt.sign(
+          {
+            firstName: user.firstName,
+            email: user.email,
+            lastName: user.lastName,
+            userTypes: user.userType,
+            uuid: user.uuid,
+          },
+          JWT_TOKEN,
+          { expiresIn: "1h" }
+        );
+        return res.status(200).json({
+          message: "Login successful.",
+          token,
+          userType: user.userType,
+        });
       });
     });
   } catch (error) {
@@ -60,11 +138,10 @@ const login = async (req, res) => {
   }
 };
 
-
-
 const signup = async (req, res) => {
-  const { firstName, lastName, contact, userType, email, password,uuid } = req.body;
-console.log(uuid)
+  const { firstName, lastName, contact, userType, email, password, uuid } =
+    req.body;
+  console.log(uuid);
   try {
     // Validate inputs
     const errors = validationResult(req);
@@ -88,7 +165,7 @@ console.log(uuid)
 
       connection.query(
         query,
-        [firstName, lastName, contact, userType, email, hashedPassword,uuid],
+        [firstName, lastName, contact, userType, email, hashedPassword, uuid],
         (error, results) => {
           connection.release(); // Release the connection back to the pool
           if (error) {
@@ -97,7 +174,7 @@ console.log(uuid)
               .status(500)
               .json({ error: "Server error during signup." });
           }
-
+          sendWelcomeEmail(email, firstName);
           return res.status(201).json({ message: "Signup successful." });
         }
       );
@@ -108,24 +185,5 @@ console.log(uuid)
   }
 };
 
-// async function getUserData(req,res) {
-//   try {
-//     const token = req.headers.authorization;
-//     if (!token) {
-//       return res.status(401).json({msg:"Unauthorized"});
-//     }
-//     const _tokenData = token.split(" ")[1];
 
-//     const _decoded = jwt.verify(_tokenData,JWT_TOKEN);
-//     const id = _decoded._id;
-//     const user = await usermodel.
-
-//     // 33
-//   } catch (error) {
-//     console.log(error)
-//     res.status(500).json({msg: "Server Side Error"});
-//   }
-  
-// }
-
-module.exports = { signup,login,getUserData };
+module.exports = { signup, login,sendOtp };
